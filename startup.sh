@@ -18,10 +18,12 @@ chmod +x .chromedriver/chromedriver
 
 echo "✅ Chrome and ChromeDriver installed to project folder"
 
-# Add to PATH (optional if using absolute path in Python)
+echo "📦 Installing Python requirements..."
+pip install -r requirements.txt
+
+# Add to PATH
 export PATH="$PWD/.chrome:$PATH"
 export PATH="$PWD/.chromedriver:$PATH"
 
-# Run Python bot
 echo "🚀 Starting bot..."
 python app.py
