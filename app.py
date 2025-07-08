@@ -126,10 +126,18 @@ async def handle_roll_number(client: Client, message: Message):
         os.remove(os.path.join(DOWNLOAD_DIR, f))
 
     success = 0
-    missing_rolls = []
+missing_rolls = []
 
-    for roll_number in roll_numbers:
+for roll_number in roll_numbers:
+    pdf_saved = False
+
+    for attempt in range(3):  # Retry up to 3 times
         try:
+            # Clear any previous PDFs
+            for f in os.listdir(DOWNLOAD_DIR):
+                if f.endswith(".pdf"):
+                    os.remove(os.path.join(DOWNLOAD_DIR, f))
+
             # Enter roll number
             input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
             input_field.clear()
@@ -154,16 +162,18 @@ async def handle_roll_number(client: Client, message: Message):
                 new_pdf_path = os.path.join(DOWNLOAD_DIR, f"{roll_number}.pdf")
                 os.rename(pdf_path, new_pdf_path)
                 success += 1
-            else:
-                missing_rolls.append(roll_number)
+                pdf_saved = True
+                break  # success mil gaya, ab retry na करो
 
             driver.refresh()
-            time.sleep(1)
+            time.sleep(2)
 
         except Exception as e:
-            missing_rolls.append(roll_number)
-            print(f"❌ Error for {roll_number}: {e}")
+            print(f"❌ Error on {roll_number} attempt {attempt+1}: {e}")
+            time.sleep(2)
 
+    if not pdf_saved:
+        missing_rolls.append(roll_number)
     if success == 0:
         await message.reply("⚠️ कोई भी PDF डाउनलोड नहीं हुआ।")
         return
