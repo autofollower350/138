@@ -72,61 +72,75 @@ async def start_handler(client: Client, message: Message):
 @app.on_message(filters.text & filters.private & ~filters.command(["start", "help"]))
 async def handle_roll_number(client: Client, message: Message):
     global driver
-    text = message.text.strip().lower().replace(" ", "")  # <- यह लाइन space हटा देगी
+    text = message.text.strip().lower().replace(" ", "")  # space हटा देंगे
 
     if driver is None:
         await message.reply("⚠️ Browser not initialized. Send /start first.")
         return
 
-    ...
-
     roll_numbers = []
 
-    # 鉁� Range input: 25rba00001-25rba00010
+    # ✅ Range input: 25rba00001-25rba00010
     if "-" in text:
         try:
             start_part, end_part = text.split("-")
-            prefix = ''.join(filter(str.isalpha, start_part))
-            start_num = int(''.join(filter(str.isdigit, start_part)))
-            end_num = int(''.join(filter(str.isdigit, end_part)))
 
-            if end_num < start_num or (end_num - start_num) > 50:
-                await message.reply("鈿狅笍 Invalid range or range too large (max 50 allowed).")
+            import re
+            match1 = re.match(r"([a-zA-Z0-9]+?)(\d+)$", start_part)
+            match2 = re.match(r"([a-zA-Z0-9]+?)(\d+)$", end_part)
+
+            if not match1 or not match2:
+                await message.reply("⚠️ Invalid roll number format.")
                 return
 
-            digit_length = len(str(start_num))
-            roll_numbers = [f"{prefix}{str(i).zfill(digit_length)}" for i in range(start_num, end_num + 1)]
-            await message.reply(f"馃攳 Fetching results for {len(roll_numbers)} roll numbers. Please wait...")
+            prefix_start, num_start = match1.groups()
+            prefix_end, num_end = match2.groups()
+
+            if prefix_start != prefix_end:
+                await message.reply("⚠️ Prefixes do not match in range.")
+                return
+
+            start_num = int(num_start)
+            end_num = int(num_end)
+            digit_length = len(num_start)
+
+            if end_num < start_num or (end_num - start_num) > 50:
+                await message.reply("⚠️ Invalid range or too large (max 50).")
+                return
+
+            roll_numbers = [f"{prefix_start}{str(i).zfill(digit_length)}" for i in range(start_num, end_num + 1)]
+            await message.reply(f"🔍 Fetching results for {len(roll_numbers)} roll numbers. Please wait...")
+
         except Exception as e:
-            await message.reply("鈿狅笍 Invalid format. Use like `25rba00001-25rba00010`")
+            await message.reply("⚠️ Invalid range format. Use like `25rba00001-25rba00010`")
             return
 
     else:
-
-        # 鉁� Single roll number
+        # ✅ Single roll number
         if not (6 <= len(text) <= 15 and text.isalnum()):
-            await message.reply("鈿狅笍 Invalid roll number. Use lowercase like `25rba00299`")
+            await message.reply("⚠️ Invalid roll number. Use lowercase like `25rba00299`")
             return
         roll_numbers = [text]
 
+    # ✅ Process each roll number one-by-one
     for roll_number in roll_numbers:
         try:
-            # 馃Ч Clear old PDFs
+            # 🧹 Clear old PDFs
             for f in os.listdir(DOWNLOAD_DIR):
                 if f.endswith(".pdf"):
                     os.remove(os.path.join(DOWNLOAD_DIR, f))
 
-            # 馃枈锔� Enter roll number
+            # 🖊️ Enter roll number
             input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
             input_field.clear()
             input_field.send_keys(roll_number)
             time.sleep(1)
 
-            # 馃煝 Submit form
+            # 🟢 Submit form
             driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[3]/span[1]/input").click()
             time.sleep(3)
 
-            # 鈴� Wait for download
+            # ⏳ Wait for download
             timeout = 5
             pdf_path = None
             for _ in range(timeout):
@@ -139,13 +153,12 @@ async def handle_roll_number(client: Client, message: Message):
             if pdf_path and os.path.exists(pdf_path):
                 driver.refresh()
                 time.sleep(2)
-                await message.reply_document(pdf_path, caption=f"馃搫 Result PDF for Roll Number: `{roll_number}`")
+                await message.reply_document(pdf_path, caption=f"📄 Result PDF for Roll Number: `{roll_number}`")
             else:
-                await message.reply(f"鉂� PDF not found for `{roll_number}`")
+                await message.reply(f"❌ PDF not found for `{roll_number}`")
 
         except Exception as e:
-            await message.reply(f"鉂� Error for `{roll_number}`: `{str(e)}`")
-
+            await message.reply(f"❌ Error for `{roll_number}`: `{str(e)}`")
 
 # Start bot
 async def main():
