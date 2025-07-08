@@ -124,8 +124,9 @@ async def handle_roll_number(client: Client, message: Message):
     # 🧹 Clear old downloads
     for f in os.listdir(DOWNLOAD_DIR):
         os.remove(os.path.join(DOWNLOAD_DIR, f))
-success = 0
-    missing_rolls = []
+
+    success = 0
+    missing_rolls = []   # 
 
     for roll_number in roll_numbers:
         pdf_saved = False
