@@ -71,6 +71,7 @@ async def start_handler(client: Client, message: Message):
         await message.reply("鉁� Bot is ready! Now send your roll number like `25rba00299`.")
 
 
+
 @app.on_message(filters.text & filters.private & ~filters.command(["start", "help"]))
 async def handle_roll_number(client: Client, message: Message):
     global driver
@@ -177,7 +178,7 @@ async def handle_roll_number(client: Client, message: Message):
             zipf.write(file_path, arcname=f)
 
     await message.reply_document(zip_path, caption=f"📦 {success_count} PDFs zipped.\n🧾 Range: `{roll_numbers[0]} - {roll_numbers[-1]}`")
-# Start bot
+#start
 async def main():
     await app.start()
     print("鉁� Bot is running...")
