@@ -6,6 +6,7 @@ import time
 import shutil
 import tempfile
 import asyncio
+import zipfile
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
@@ -69,7 +70,6 @@ async def start_handler(client: Client, message: Message):
 
         await message.reply("鉁� Bot is ready! Now send your roll number like `25rba00299`.")
 
-
 @app.on_message(filters.text & filters.private & ~filters.command(["start", "help"]))
 async def handle_roll_number(client: Client, message: Message):
     global driver
@@ -80,10 +80,11 @@ async def handle_roll_number(client: Client, message: Message):
         await message.reply("⚠️ Browser not initialized. Send /start first.")
         return
 
-    # ✅ Check if range or single roll number
+    # ✅ Range input
     if "-" in text:
         try:
             start_part, end_part = text.split("-")
+
             import re
             match1 = re.match(r"([a-zA-Z]+)(\d+)$", start_part)
             match2 = re.match(r"([a-zA-Z]+)(\d+)$", end_part)
@@ -112,24 +113,24 @@ async def handle_roll_number(client: Client, message: Message):
         except:
             await message.reply("⚠️ Invalid format. Use like `25rba00001-25rba00050`.")
             return
+
     else:
         if not (6 <= len(text) <= 15 and text.isalnum()):
             await message.reply("⚠️ Invalid roll number.")
             return
         roll_numbers = [text]
 
-    # 🧹 Clean old files (only once)
+    # 🧹 Clean old files
     for f in os.listdir(DOWNLOAD_DIR):
         os.remove(os.path.join(DOWNLOAD_DIR, f))
 
     success_count = 0
-
     for roll_number in roll_numbers:
         try:
-            # Remove if already exists
-            existing_pdf = os.path.join(DOWNLOAD_DIR, f"{roll_number}.pdf")
-            if os.path.exists(existing_pdf):
-                os.remove(existing_pdf)
+            # Remove existing named file
+            final_path = os.path.join(DOWNLOAD_DIR, f"{roll_number}.pdf")
+            if os.path.exists(final_path):
+                os.remove(final_path)
 
             # 🖊️ Enter roll number
             input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
@@ -137,7 +138,7 @@ async def handle_roll_number(client: Client, message: Message):
             input_field.send_keys(roll_number)
             time.sleep(1)
 
-            # Submit form
+            # Submit
             driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[3]/span[1]/input").click()
             time.sleep(3)
 
@@ -155,17 +156,10 @@ async def handle_roll_number(client: Client, message: Message):
                 new_pdf_path = os.path.join(DOWNLOAD_DIR, f"{roll_number}.pdf")
                 os.rename(pdf_path, new_pdf_path)
                 success_count += 1
-
-                # Clean leftover files (if accidentally multiple)
-                for f in os.listdir(DOWNLOAD_DIR):
-                    if f.endswith(".pdf") and f != f"{roll_number}.pdf":
-                        os.remove(os.path.join(DOWNLOAD_DIR, f))
+                driver.refresh()
+                time.sleep(1)
             else:
                 await message.reply(f"❌ PDF not found for `{roll_number}`")
-
-            # Refresh for next roll number
-            driver.refresh()
-            time.sleep(2)
 
         except Exception as e:
             await message.reply(f"❌ Error for `{roll_number}`: `{str(e)}`")
@@ -174,15 +168,16 @@ async def handle_roll_number(client: Client, message: Message):
         await message.reply("⚠️ कोई भी PDF नहीं मिली।")
         return
 
-    # ✅ Make ZIP of all found PDFs
+    # ✅ Create ZIP file
     zip_path = os.path.join("/tmp", f"results_{roll_numbers[0]}_to_{roll_numbers[-1]}.zip")
     with zipfile.ZipFile(zip_path, "w") as zipf:
         for f in os.listdir(DOWNLOAD_DIR):
             file_path = os.path.join(DOWNLOAD_DIR, f)
             zipf.write(file_path, arcname=f)
 
-    await message.reply_document(zip_path, caption=f"📦 {success_count} PDFs zipped.\n📋 Range: `{roll_numbers[0]} - {roll_numbers[-1]}`")
-# Start bot
+    await message.reply_document(zip_path, caption=f"📦 {success_count} PDFs zipped.\n🧾 Range: `{roll_numbers[0]} - {roll_numbers[-1]}`")
+
+#start
 async def main():
     await app.start()
     print("鉁� Bot is running...")
