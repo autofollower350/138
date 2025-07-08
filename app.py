@@ -104,9 +104,9 @@ async def handle_roll_number(client: Client, message: Message):
             end_num = int(num_end)
             digit_length = len(num_start)
 
-            if end_num < start_num or (end_num - start_num) > 50:
-                await message.reply("⚠️ Invalid range or too large (max 50).")
-                return
+            if end_num < start_num or (end_num - start_num) > 500:
+    await message.reply("⚠️ Invalid range or too large (max 500).")
+    return
 
             roll_numbers = [f"{prefix_start}{str(i).zfill(digit_length)}" for i in range(start_num, end_num + 1)]
             await message.reply(f"🔍 Fetching results for {len(roll_numbers)} roll numbers. Please wait...")
