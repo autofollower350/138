@@ -158,7 +158,7 @@ async def handle_roll_number(client: Client, message: Message):
 
             # ✅ Refresh after each roll to reset page
             driver.refresh()
-            time.sleep(1)
+            time.sleep(3)
 
         except Exception as e:
             print(f"❌ Error for {roll_number}: {e}")
