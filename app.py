@@ -87,7 +87,6 @@ async def handle_roll_number(client: Client, message: Message):
         try:
             start_part, end_part = text.split("-")
 
-            import re
             match1 = re.match(r"([a-zA-Z0-9]+?)(\d+)$", start_part)
             match2 = re.match(r"([a-zA-Z0-9]+?)(\d+)$", end_part)
 
@@ -123,29 +122,24 @@ async def handle_roll_number(client: Client, message: Message):
             return
         roll_numbers = [text]
 
-    # 🧹 Clear old downloads
+    # 🧹 Clear old downloads ONCE before starting
     for f in os.listdir(DOWNLOAD_DIR):
         os.remove(os.path.join(DOWNLOAD_DIR, f))
 
     success = 0
     for roll_number in roll_numbers:
         try:
-            # Clear PDF before next input
-            for f in os.listdir(DOWNLOAD_DIR):
-                if f.endswith(".pdf"):
-                    os.remove(os.path.join(DOWNLOAD_DIR, f))
-
-            # Input roll number
+            # 🖊️ Enter roll number
             input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
             input_field.clear()
             input_field.send_keys(roll_number)
             time.sleep(1)
 
-            # Submit
+            # 🟢 Submit
             driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[3]/span[1]/input").click()
             time.sleep(3)
 
-            # Wait for PDF
+            # ⏳ Wait for PDF
             timeout = 5
             pdf_path = None
             for _ in range(timeout):
@@ -156,12 +150,15 @@ async def handle_roll_number(client: Client, message: Message):
                 time.sleep(1)
 
             if pdf_path and os.path.exists(pdf_path):
-                new_pdf_name = f"{roll_number}.pdf"
-                os.rename(pdf_path, os.path.join(DOWNLOAD_DIR, new_pdf_name))
-                driver.refresh()
+                new_pdf_path = os.path.join(DOWNLOAD_DIR, f"{roll_number}.pdf")
+                os.rename(pdf_path, new_pdf_path)
                 success += 1
             else:
                 print(f"❌ Not found: {roll_number}")
+
+            # ✅ Refresh after each roll to reset page
+            driver.refresh()
+            time.sleep(1)
 
         except Exception as e:
             print(f"❌ Error for {roll_number}: {e}")
@@ -178,7 +175,6 @@ async def handle_roll_number(client: Client, message: Message):
             zipf.write(full_path, arcname=file)
 
     await message.reply_document(zip_path, caption=f"📦 {success} PDFs zipped.\n🧾 Range: `{roll_numbers[0]} - {roll_numbers[-1]}`")
-#start
 async def main():
     await app.start()
     print("鉁� Bot is running...")
