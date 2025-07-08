@@ -6,6 +6,7 @@ import time
 import shutil
 import tempfile
 import asyncio
+import zipfile
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
@@ -72,7 +73,7 @@ async def start_handler(client: Client, message: Message):
 @app.on_message(filters.text & filters.private & ~filters.command(["start", "help"]))
 async def handle_roll_number(client: Client, message: Message):
     global driver
-    text = message.text.strip().lower().replace(" ", "")  # space हटा देंगे
+    text = message.text.strip().lower().replace(" ", "")
 
     if driver is None:
         await message.reply("⚠️ Browser not initialized. Send /start first.")
@@ -80,7 +81,7 @@ async def handle_roll_number(client: Client, message: Message):
 
     roll_numbers = []
 
-    # ✅ Range input: 25rba00001-25rba00010
+    # ✅ RANGE DETECTION
     if "-" in text:
         try:
             start_part, end_part = text.split("-")
@@ -104,43 +105,46 @@ async def handle_roll_number(client: Client, message: Message):
             end_num = int(num_end)
             digit_length = len(num_start)
 
-            if end_num < start_num or (end_num - start_num) > 50:
-                await message.reply("⚠️ Invalid range or too large (max 50).")
+            if end_num < start_num or (end_num - start_num) > 10000:
+                await message.reply("⚠️ Invalid range or too large (max 10,000).")
                 return
 
             roll_numbers = [f"{prefix_start}{str(i).zfill(digit_length)}" for i in range(start_num, end_num + 1)]
-            await message.reply(f"🔍 Fetching results for {len(roll_numbers)} roll numbers. Please wait...")
+            await message.reply(f"🔍 Downloading PDFs for {len(roll_numbers)} roll numbers. Please wait...")
 
         except Exception as e:
-            await message.reply("⚠️ Invalid range format. Use like `25rba00001-25rba00010`")
+            await message.reply("⚠️ Invalid range format. Use like `25rba00001-25rba00100`")
             return
 
     else:
-        # ✅ Single roll number
         if not (6 <= len(text) <= 15 and text.isalnum()):
             await message.reply("⚠️ Invalid roll number. Use lowercase like `25rba00299`")
             return
         roll_numbers = [text]
 
-    # ✅ Process each roll number one-by-one
+    # 🧹 Clear old downloads
+    for f in os.listdir(DOWNLOAD_DIR):
+        os.remove(os.path.join(DOWNLOAD_DIR, f))
+
+    success = 0
     for roll_number in roll_numbers:
         try:
-            # 🧹 Clear old PDFs
+            # Clear PDF before next input
             for f in os.listdir(DOWNLOAD_DIR):
                 if f.endswith(".pdf"):
                     os.remove(os.path.join(DOWNLOAD_DIR, f))
 
-            # 🖊️ Enter roll number
+            # Input roll number
             input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
             input_field.clear()
             input_field.send_keys(roll_number)
             time.sleep(1)
 
-            # 🟢 Submit form
+            # Submit
             driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[3]/span[1]/input").click()
             time.sleep(3)
 
-            # ⏳ Wait for download
+            # Wait for PDF
             timeout = 5
             pdf_path = None
             for _ in range(timeout):
@@ -151,15 +155,28 @@ async def handle_roll_number(client: Client, message: Message):
                 time.sleep(1)
 
             if pdf_path and os.path.exists(pdf_path):
+                new_pdf_name = f"{roll_number}.pdf"
+                os.rename(pdf_path, os.path.join(DOWNLOAD_DIR, new_pdf_name))
                 driver.refresh()
-                time.sleep(2)
-                await message.reply_document(pdf_path, caption=f"📄 Result PDF for Roll Number: `{roll_number}`")
+                success += 1
             else:
-                await message.reply(f"❌ PDF not found for `{roll_number}`")
+                print(f"❌ Not found: {roll_number}")
 
         except Exception as e:
-            await message.reply(f"❌ Error for `{roll_number}`: `{str(e)}`")
+            print(f"❌ Error for {roll_number}: {e}")
 
+    if success == 0:
+        await message.reply("⚠️ कोई भी PDF डाउनलोड नहीं हुआ। कृपया रोल नंबर जांचें।")
+        return
+
+    # 📦 Create ZIP
+    zip_path = os.path.join("/tmp", f"results_{roll_numbers[0]}_to_{roll_numbers[-1]}.zip")
+    with zipfile.ZipFile(zip_path, "w") as zipf:
+        for file in os.listdir(DOWNLOAD_DIR):
+            full_path = os.path.join(DOWNLOAD_DIR, file)
+            zipf.write(full_path, arcname=file)
+
+    await message.reply_document(zip_path, caption=f"📦 {success} PDFs zipped.\n🧾 Range: `{roll_numbers[0]} - {roll_numbers[-1]}`")
 # Start bot
 async def main():
     await app.start()
