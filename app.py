@@ -33,7 +33,7 @@ app = Client("jnvu_result_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_
 async def start_handler(client: Client, message: Message):
     global driver, user_data_dir
 
-    await message.reply("🔄 Starting browser session...")
+    await message.reply("馃攧 Starting bro...")
 
     if driver is None:
         # Setup Chrome options
@@ -43,7 +43,7 @@ async def start_handler(client: Client, message: Message):
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
 
-        # ✅ Create unique temp folder for Chrome profile
+        # 鉁� Create unique temp folder for Chrome profile
         user_data_dir = tempfile.mkdtemp()
         chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
@@ -67,69 +67,94 @@ async def start_handler(client: Client, message: Message):
         driver.find_element(By.XPATH, "/html/body/form/div[3]/div/div/fieldset/div/div[3]/div/div/div/table/tbody/tr[2]/td/div/ul/div/table/tbody/tr[2]/td[2]/span[1]/a").click()
         time.sleep(2)
 
-        await message.reply("✅ Bot is ready! Now send your roll number like `25rba00299`.")
-
+        await message.reply("鉁� Bot is ready! Now send your roll number like `25rba00299`.")
 
 @app.on_message(filters.text & filters.private & ~filters.command(["start", "help"]))
 async def handle_roll_number(client: Client, message: Message):
     global driver
-    roll_number = message.text.strip()
-
-    if not (6 <= len(roll_number) <= 15 and roll_number.isalnum()):
-        await message.reply("⚠️ Invalid roll number. Use lowercase like `25rba00299`")
-        return
+    text = message.text.strip().lower()
 
     if driver is None:
-        await message.reply("⚠️ Browser not initialized. Send /start first.")
+        await message.reply("鈿狅笍 Browser not initialized. Send /start first.")
         return
 
-    try:
-        # Clear old PDFs
-        for f in os.listdir(DOWNLOAD_DIR):
-            if f.endswith(".pdf"):
-                os.remove(os.path.join(DOWNLOAD_DIR, f))
+    roll_numbers = []
 
-        # Enter roll number
-        input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
-        input_field.clear()
-        input_field.send_keys(roll_number)
-        time.sleep(1)
+    # 鉁� Range input: 25rba00001-25rba00010
+    if "-" in text:
+        try:
+            start_part, end_part = text.split("-")
+            prefix = ''.join(filter(str.isalpha, start_part))
+            start_num = int(''.join(filter(str.isdigit, start_part)))
+            end_num = int(''.join(filter(str.isdigit, end_part)))
 
-        # Submit form
-        driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[3]/span[1]/input").click()
-        time.sleep(3)
+            if end_num < start_num or (end_num - start_num) > 50:
+                await message.reply("鈿狅笍 Invalid range or range too large (max 50 allowed).")
+                return
 
-        # Wait for download
-        timeout = 5
-        pdf_path = None
-        for _ in range(timeout):
-            pdf_files = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith(".pdf")]
-            if pdf_files:
-                pdf_path = os.path.join(DOWNLOAD_DIR, pdf_files[0])
-                break
+            digit_length = len(str(start_num))
+            roll_numbers = [f"{prefix}{str(i).zfill(digit_length)}" for i in range(start_num, end_num + 1)]
+            await message.reply(f"馃攳 Fetching results for {len(roll_numbers)} roll numbers. Please wait...")
+        except Exception as e:
+            await message.reply("鈿狅笍 Invalid format. Use like `25rba00001-25rba00010`")
+            return
+
+    else:
+
+        # 鉁� Single roll number
+        if not (6 <= len(text) <= 15 and text.isalnum()):
+            await message.reply("鈿狅笍 Invalid roll number. Use lowercase like `25rba00299`")
+            return
+        roll_numbers = [text]
+
+    for roll_number in roll_numbers:
+        try:
+            # 馃Ч Clear old PDFs
+            for f in os.listdir(DOWNLOAD_DIR):
+                if f.endswith(".pdf"):
+                    os.remove(os.path.join(DOWNLOAD_DIR, f))
+
+            # 馃枈锔� Enter roll number
+            input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
+            input_field.clear()
+            input_field.send_keys(roll_number)
             time.sleep(1)
 
-        if pdf_path and os.path.exists(pdf_path):
-            driver.refresh()
-            time.sleep(2)
-            await message.reply_document(pdf_path, caption=f"📄 Result PDF for Roll Number: `{roll_number}`")
-        else:
-            await message.reply("⚠️ Result PDF not found. Please check the roll number or try again later.")
+            # 馃煝 Submit form
+            driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[3]/span[1]/input").click()
+            time.sleep(3)
 
-    except Exception as e:
-        await message.reply(f"❌ Error: `{str(e)}`")
+            # 鈴� Wait for download
+            timeout = 5
+            pdf_path = None
+            for _ in range(timeout):
+                pdf_files = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith(".pdf")]
+                if pdf_files:
+                    pdf_path = os.path.join(DOWNLOAD_DIR, pdf_files[0])
+                    break
+                time.sleep(1)
+
+            if pdf_path and os.path.exists(pdf_path):
+                driver.refresh()
+                time.sleep(2)
+                await message.reply_document(pdf_path, caption=f"馃搫 Result PDF for Roll Number: `{roll_number}`")
+            else:
+                await message.reply(f"鉂� PDF not found for `{roll_number}`")
+
+        except Exception as e:
+            await message.reply(f"鉂� Error for `{roll_number}`: `{str(e)}`")
 
 
 # Start bot
 async def main():
     await app.start()
-    print("✅ Bot is running...")
+    print("鉁� Bot is running...")
     await asyncio.Event().wait()
 
 try:
     asyncio.run(main())
 except (KeyboardInterrupt, SystemExit):
-    print("🛑 Stopping bot...")
+    print("馃洃 Stopping bot...")
 finally:
     if driver:
         driver.quit()
