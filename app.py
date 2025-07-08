@@ -70,6 +70,7 @@ async def start_handler(client: Client, message: Message):
         time.sleep(2)
 
         await message.reply("鉁� Bot is ready! Now send your roll number like `25rba00299`.")
+
 @app.on_message(filters.text & filters.private & ~filters.command(["start", "help"]))
 async def handle_roll_number(client: Client, message: Message):
     global driver
@@ -121,83 +122,59 @@ async def handle_roll_number(client: Client, message: Message):
             return
         roll_numbers = [text]
 
-    # 🧹 Clear old downloads
+    # 🧹 Clear old downloads ONCE before starting
     for f in os.listdir(DOWNLOAD_DIR):
         os.remove(os.path.join(DOWNLOAD_DIR, f))
 
     success = 0
-    missing_rolls = []   # 
-
     for roll_number in roll_numbers:
-        pdf_saved = False
+        try:
+            # 🖊️ Enter roll number
+            input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
+            input_field.clear()
+            input_field.send_keys(roll_number)
+            time.sleep(1)
 
-        for attempt in range(3):  # Retry up to 3 times
-            try:
-                # Clear previous PDFs
-                for f in os.listdir(DOWNLOAD_DIR):
-                    if f.endswith(".pdf"):
-                        os.remove(os.path.join(DOWNLOAD_DIR, f))
+            # 🟢 Submit
+            driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[3]/span[1]/input").click()
+            time.sleep(3)
 
-                # Enter roll number
-                input_field = driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[2]/table/tbody/tr/td[2]/span/input")
-                input_field.clear()
-                input_field.send_keys(roll_number)
+            # ⏳ Wait for PDF
+            timeout = 5
+            pdf_path = None
+            for _ in range(timeout):
+                pdf_files = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith(".pdf")]
+                if pdf_files:
+                    pdf_path = os.path.join(DOWNLOAD_DIR, pdf_files[0])
+                    break
                 time.sleep(1)
 
-                # Submit
-                driver.find_element(By.XPATH, "/html/body/form/div[4]/div/div[3]/span[1]/input").click()
-                time.sleep(3)
+            if pdf_path and os.path.exists(pdf_path):
+                new_pdf_path = os.path.join(DOWNLOAD_DIR, f"{roll_number}.pdf")
+                os.rename(pdf_path, new_pdf_path)
+                success += 1
+            else:
+                print(f"❌ Not found: {roll_number}")
 
-                # Wait for PDF
-                timeout = 5
-                pdf_path = None
-                for _ in range(timeout):
-                    pdf_files = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith(".pdf")]
-                    if pdf_files:
-                        pdf_path = os.path.join(DOWNLOAD_DIR, pdf_files[0])
-                        break
-                    time.sleep(1)
+            # ✅ Refresh after each roll to reset page
+            driver.refresh()
+            time.sleep(1)
 
-                if pdf_path and os.path.exists(pdf_path):
-                    new_pdf_path = os.path.join(DOWNLOAD_DIR, f"{roll_number}.pdf")
-                    os.rename(pdf_path, new_pdf_path)
-                    success += 1
-                    pdf_saved = True
-                    break  # success ho gaya, retry band
-
-                driver.refresh()
-                time.sleep(2)
-
-            except Exception as e:
-                print(f"❌ Error on {roll_number} attempt {attempt+1}: {e}")
-                time.sleep(2)
-
-        if not pdf_saved:
-            missing_rolls.append(roll_number)
+        except Exception as e:
+            print(f"❌ Error for {roll_number}: {e}")
 
     if success == 0:
-        await message.reply("⚠️ कोई भी PDF डाउनलोड नहीं हुआ।")
+        await message.reply("⚠️ कोई भी PDF डाउनलोड नहीं हुआ। कृपया रोल नंबर जांचें।")
         return
 
     # 📦 Create ZIP
     zip_path = os.path.join("/tmp", f"results_{roll_numbers[0]}_to_{roll_numbers[-1]}.zip")
     with zipfile.ZipFile(zip_path, "w") as zipf:
-        for file in sorted(os.listdir(DOWNLOAD_DIR)):
+        for file in os.listdir(DOWNLOAD_DIR):
             full_path = os.path.join(DOWNLOAD_DIR, file)
             zipf.write(full_path, arcname=file)
 
-    # Prepare result message
-    result_text = f"📦 {success} PDFs zipped.\n🧾 Range: `{roll_numbers[0]} - {roll_numbers[-1]}`"
-
-    if missing_rolls:
-        if len(missing_rolls) > 10:
-            result_text += f"\n❌ {len(missing_rolls)} PDFs missing."
-        else:
-            result_text += "\n❌ Missing PDFs for:\n" + ", ".join(missing_rolls)
-
-    await message.reply_document(zip_path, caption=result_text)
-
-   #start
+    await message.reply_document(zip_path, caption=f"📦 {success} PDFs zipped.\n🧾 Range: `{roll_numbers[0]} - {roll_numbers[-1]}`")
 async def main():
     await app.start()
     print("鉁� Bot is running...")
