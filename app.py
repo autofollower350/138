@@ -96,16 +96,8 @@ async def handle_roll_number(client: Client, message: Message):
             prefix_start, num_start = match1.groups()
             prefix_end, num_end = match2.groups()
 
-            if prefix_start != prefix_end:
-                await message.reply("⚠️ Prefixes do not match in range.")
-                return
-
-            start_num = int(num_start)
-            end_num = int(num_end)
-            digit_length = len(num_start)
-
             if end_num < start_num or (end_num - start_num) > 500:
-        await message.reply("⚠️ Invalid range or too large (max 500).")
+    await message.reply("⚠️ Invalid range or too large (max 500).")
     return
 
             roll_numbers = [f"{prefix_start}{str(i).zfill(digit_length)}" for i in range(start_num, end_num + 1)]
