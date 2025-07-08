@@ -72,11 +72,13 @@ async def start_handler(client: Client, message: Message):
 @app.on_message(filters.text & filters.private & ~filters.command(["start", "help"]))
 async def handle_roll_number(client: Client, message: Message):
     global driver
-    text = message.text.strip().lower()
+    text = message.text.strip().lower().replace(" ", "")  # <- यह लाइन space हटा देगी
 
     if driver is None:
-        await message.reply("鈿狅笍 Browser not initialized. Send /start first.")
+        await message.reply("⚠️ Browser not initialized. Send /start first.")
         return
+
+    ...
 
     roll_numbers = []
 
