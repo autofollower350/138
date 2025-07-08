@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import asyncio
 import zipfile
+import re
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
@@ -73,7 +74,7 @@ async def start_handler(client: Client, message: Message):
 @app.on_message(filters.text & filters.private & ~filters.command(["start", "help"]))
 async def handle_roll_number(client: Client, message: Message):
     global driver
-    text = message.text.strip().lower().replace(" ", "")
+text = re.sub(r"[^\w\-]", "", message.text.strip().lower())
     roll_numbers = []
 
     if driver is None:
